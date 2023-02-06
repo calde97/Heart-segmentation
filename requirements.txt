@@ -4,3 +4,8 @@ numpy
 pynrrd
 pydicom
 SimpleITK
+imageio
+natsort
+tqdm
+plotly
+dash
