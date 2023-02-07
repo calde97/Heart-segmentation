@@ -6,8 +6,7 @@ import nrrd
 import pydicom
 from natsort import natsorted
 
-import constants
-
+import data.constants as constants
 
 def create_mask_and_picture(folder: str, list_images, list_masks, names=None):
     # create folder if not exist
