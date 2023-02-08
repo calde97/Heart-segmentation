@@ -1,4 +1,8 @@
-DATA_HOME = '/home/calde/Desktop/master-thesis-corino/data-tesi-corino'
+import os
+
+HOME = '/home/calde/Desktop/master-thesis-corino'
+SOURCE_FOLDER = 'data-tesi-corino'
+DATA_HOME = os.path.join(HOME, SOURCE_FOLDER)
 IPERTROFIA_PATH = 'Data_ipertrofia'
 AMILIODOSI_PATH = 'Data_amiloidosi_new'
 STENOSI_PATH = 'Data_stenosi_new'
