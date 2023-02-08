@@ -7,7 +7,8 @@ from data.preprocessing import read_single_dicom
 
 
 class ImageSegmentationDataset(Dataset):
-    def __init__(self, csv_file, transform=None, limit_for_testing=None):
+    def __init__(self, csv_file, transform=None, limit_for_testing=None, apply_hu_transformation=True,
+                 apply_windowing=True):
         df = pd.read_csv(csv_file)
         self.image_paths = df['X_path'].values.tolist()
         self.mask_paths = df['y_path'].values.tolist()
@@ -15,6 +16,8 @@ class ImageSegmentationDataset(Dataset):
             self.image_paths = self.image_paths[:limit_for_testing]
             self.mask_paths = self.mask_paths[:limit_for_testing]
         self.transform = transform
+        self.hu_transform_flag = apply_hu_transformation
+        self.windowing_flag = apply_windowing
 
     def __len__(self):
         return len(self.image_paths)
@@ -23,7 +26,8 @@ class ImageSegmentationDataset(Dataset):
         image_path = self.image_paths[idx]
         mask_math = self.mask_paths[idx]
 
-        image = read_single_dicom(image_path)
+        image = read_single_dicom(image_path, hu_transformation_flag=self.hu_transform_flag,
+                                  windowing_flag=self.windowing_flag)
         mask = nrrd.read(mask_math)[0]
         image = np.float32(image)
         # get max of image
