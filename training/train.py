@@ -50,7 +50,6 @@ def train(config=None):
         optimizer = optim.Adam(model.parameters(), lr=lr)
         num_epochs = 50
 
-
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Resize((256, 256)),
@@ -75,12 +74,11 @@ def train(config=None):
         training_dataset = ImageSegmentationDataset(csv_file=training_path, transform=transform,
                                                     limit_for_testing=limit,
                                                     apply_hu_transformation=True, apply_windowing=True)
-        validation_dataset = ImageSegmentationDataset(csv_file=training_path, transform=transform,
+        validation_dataset = ImageSegmentationDataset(csv_file=validation_path, transform=transform,
                                                       limit_for_testing=limit)
 
         if flag_testing:
             validation_dataset = training_dataset
-
 
         train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=shuffle_training)
         valid_loader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=shuffle_validation)
