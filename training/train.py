@@ -1,5 +1,4 @@
 from datetime import datetime
-
 import numpy as np
 import torch
 from torch import nn, optim
@@ -35,25 +34,27 @@ def dice_loss(predicted, labels):
 
 
 if __name__ == '__main__':
-    batch_size = 2
-    num_epochs = 10
+    batch_size = 1
+    num_epochs = 100
     lr = 0.0001
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Resize((256, 256)),
-        #transforms.RandomVerticalFlip(p=0.5),
-        #transforms.RandomHorizontalFlip(p=0.5),
-        #transforms.RandomRotation(degrees=180)
+        transforms.RandomVerticalFlip(p=0.5),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomRotation(degrees=180)
     ])
     training_path = '../data/csv_files/train.csv'
     validation_path = '../data/csv_files/val.csv'
 
-    training_dataset = ImageSegmentationDataset(csv_file=training_path, transform=transform, limit_for_testing=10,
+    limit = None
+
+    training_dataset = ImageSegmentationDataset(csv_file=training_path, transform=transform, limit_for_testing=limit,
                                                 apply_hu_transformation=True, apply_windowing=True)
-    validation_dataset = ImageSegmentationDataset(csv_file=training_path, transform=transform, limit_for_testing=10)
-    train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=False)
+    validation_dataset = ImageSegmentationDataset(csv_file=training_path, transform=transform, limit_for_testing=limit)
+    train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True)
     valid_loader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False)
 
     model = UNet(num_classes=1).to(device)
@@ -90,7 +91,6 @@ if __name__ == '__main__':
             inner_bar.set_description(f"Loss: {loss.item():.2f}, IoU: {iou:.2f}")
 
         mean_loss = total_training_loss / len(train_loader)
-        outer_bar.set_description(f"Epoch: {epoch + 1}/{num_epochs}, Training loss: {mean_loss:.2f}")
         outer_bar.set_description(f"Epoch: {epoch + 1}/{num_epochs}, Training loss: {mean_loss:.2f}")
         outer_bar.set_description(f"Epoch: {epoch + 1}/{num_epochs}, Training IoU: {total_training_iou / len(train_loader):.2f}")
 
