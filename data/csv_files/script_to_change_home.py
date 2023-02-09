@@ -2,7 +2,7 @@ import pandas as pd
 
 import os
 from data import constants
-
+import argparse
 '''
 Change the path for the HOME if we use csv files produced on another machine.
 '''
@@ -17,6 +17,12 @@ def change_home_path(path, new_home_path):
 
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('home', type=str, default=constants.HOME, help='The new home path')
+
+
+
     df_train = pd.read_csv('data/csv_files/train.csv')
     df_test = pd.read_csv('data/csv_files/test.csv')
     df_val = pd.read_csv('data/csv_files/val.csv')
