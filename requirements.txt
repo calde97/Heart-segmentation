@@ -9,3 +9,4 @@ natsort
 tqdm
 plotly
 dash
+wandb
