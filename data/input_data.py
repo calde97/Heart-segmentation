@@ -36,10 +36,15 @@ class ImageSegmentationDataset(Dataset):
         min_value = np.min(image)
         # normalize image
         image = (image - min_value) / (max_value - min_value)
-        mask = np.float32(mask)
+        #mask = np.float32(mask)
 
         if self.transform:
             image = self.transform(image)
             mask = self.transform(mask)
+
+        mask = mask.float()
+
+        # asser mask contains only 0 and 1
+        assert np.all(np.unique(mask) == np.array([0., 1.]))
 
         return image, mask
