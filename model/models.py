@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 
+from data import constants
+
+
 class TinyModel(torch.nn.Module):
 
     def __init__(self):
@@ -82,12 +85,64 @@ class UNet(nn.Module):
         output_out = self.output(expansive_42_out)  # [-1, num_classes, 256, 256]
         return output_out
 
+class Autoencoder(nn.Module):
+    def __init__(self):
+        super(Autoencoder, self).__init__()
+        self.encoder = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            nn.Dropout2d(0.2),
+            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.Dropout2d(0.2),
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.Dropout2d(0.2),
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+        )
 
-#%%
+        self.flatten = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(128 * 16 * 16, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128 * 16 * 16),
+            nn.ReLU(),
+            nn.Unflatten(1, (128, 16, 16))
+        )
 
-if __name__ == '__main__':
-    unet = UNet(num_classes=1)
-    from torchsummary import summary
-    print(summary(unet, (1, 256, 256)))
-    print(unet)
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            nn.ConvTranspose2d(16, 1, kernel_size=3, stride=2, padding=1, output_padding=1),
+            #nn.Sigmoid(),
+        )
 
+        '''            nn.Linear(64, 64),
+                    nn.ReLU(),'''
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.flatten(x)
+        x = self.decoder(x)
+        return x
+
+
+def get_model_from_name(name):
+    if name == constants.UNET_MODEL:
+        return UNet(num_classes=1)
+    if name == constants.AUTOENCODER_MODEL:
+        return Autoencoder()
+    else:
+        raise ValueError('Unknown model name: {}'.format(name))
