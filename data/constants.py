@@ -16,3 +16,12 @@ ROI_T = 'ROI_T.nrrd'
 reading_order = {IPERTROFIA_PATH: False,
                  AMILIODOSI_PATH: True,
                  STENOSI_PATH: False}
+
+
+MODE_AUGMENTATION_TRAIN = 'train'
+MODE_AUGMENTATION_VAL = 'val'
+MODE_AUGMENTATION_TRAIN_ENCODER = 'train_encoder'
+DICE_LOSS = 'dice_loss'
+BCE_LOSS = 'bce_loss'
+UNET_MODEL = 'unet'
+AUTOENCODER_MODEL = 'autoencoder'
