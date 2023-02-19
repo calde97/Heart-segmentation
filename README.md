@@ -1,9 +1,32 @@
-# Heart-segmentation
-Left ventricular segmentation with deep learning
+# Automatic left ventricle segmentation
 
-The repo is structured in the following folders. 
+This repository contains code for performing left ventricular segmentation using deep learning. The code provides all the necessary steps for training the model and performing inference on **CT scans**. Additionally, a detailed report on the model and techniques used will be provided in the future.
 
-### Data
-----------------------
-Here we load the images from the Dicom files and the masks from the nrrd files. We then create a csv file with the training/validation test split.
-We also provide different preprocessing steps. 
+## Repository structure
+
+The repository is structured as follows:
+
+- `Data`: This folder contains code to load images from DICOM files and masks from NRRD files. It also includes code to create a CSV file for the training/validation test split. Various preprocessing steps are also included in this folder. Here there also the code for creating the custom dataset for pytorch
+- `Model`: This folder contains a baseline UNET model for left ventricular segmentation.
+- `Training`: This folder contains code to train the UNET model. It includes a fix for the IoU metrics.
+- `Evaluation`: This folder contains code for evaluating the model's performance.
+- `dash-visualizations`: This folder includes a Plotly visualization of the model results on the validation data.
+- `LICENSE`: This file contains the repository's license.
+- `requirements.txt`: This file lists the dependencies required to run the code in this repository.
+
+## Getting started
+
+To get started with this repository, you will need to install the required dependencies listed in `requirements.txt`. You can do this by running the following command:
+
+```bash
+pip install -r requirements.txt
+```
+Remember to also intall pytorch from the official website
+
+
+
+Once you have installed the dependencies, you can use the code in this repository to train and evaluate the UNET model for left ventricular segmentation.
+
+## Contributors
+
+This repository was created by Juan Calderon
