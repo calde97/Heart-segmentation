@@ -1,0 +1,34 @@
+program: generic_training.py
+method: random
+metric:
+  name: mean_val_loss
+  goal: minimize
+parameters:
+  batch_size:
+    values : [2, 4, 8]
+  learning_rate:
+    min: 0.00001
+    max: 0.01
+    distribution: uniform
+  num_epochs:
+    value: 200
+  criterion:
+    values: ['dice_loss']
+  model:
+    value: 'unet_generic'
+  training_path:
+    value: "../data/csv_files/train.csv"
+  validation_path:
+    value: "../data/csv_files/val.csv"
+  max_non_improvement_epochs:
+    value: 40
+  min_val_iou_for_saving:
+    value: 0.20
+  dataset_as_slices:
+    value: True
+  num_slices:
+    value: 7
+  debug_testing:
+    value: False
+
+
