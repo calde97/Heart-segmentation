@@ -5,6 +5,7 @@ from datetime import datetime
 import torch
 import torchmetrics
 import yaml
+from torch import nn
 # import data loader
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -12,8 +13,8 @@ from tqdm import tqdm
 import wandb
 from data import constants
 from data.custom_augmentations import get_augmentation_transform
-from data.input_data import ImageSegmentationDataset
-from model.models import get_model_from_name
+from data.input_data import ImageSegmentationDataset, ImageSegmentationMultipleSlicesAsChannelsDataset
+from model.models import get_model_from_name, Autoencoder
 from model_metrics.metrics import get_criterion_from_name
 
 
@@ -22,6 +23,7 @@ def generic_training(config=None):
         config = wandb.config
         trainer = TrainingClass(config)
         trainer.train_unet()
+        #trainer.train_hybrid()
 
 
 class TrainingClass:
@@ -38,23 +40,54 @@ class TrainingClass:
         self.max_non_improvement_epochs = config.max_non_improvement_epochs
         self.IoU = torchmetrics.JaccardIndex(num_classes=1, task='binary').to(self.device)
         self.min_val_iou_for_saving = config.min_val_iou_for_saving
+        self.dataset_as_slices = config.dataset_as_slices
+        self.num_slices = config.num_slices
 
-        self.model = get_model_from_name(self.model_name).to(self.device)
+        self.model = get_model_from_name(self.model_name, self.num_slices).to(self.device)
         self.criterion = get_criterion_from_name(self.criterion_name)
         # for now adam is fixed, but we can add more optimizers later
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
-        self.training_dataset = ImageSegmentationDataset(csv_file=self.training_path,
-                                                         transform=get_augmentation_transform(
-                                                             constants.MODE_AUGMENTATION_TRAIN))
-        self.validation_dataset = ImageSegmentationDataset(csv_file=self.validation_path,
-                                                           transform=get_augmentation_transform(
-                                                               constants.MODE_AUGMENTATION_VAL))
+        transform_train = get_augmentation_transform(constants.MODE_AUGMENTATION_TRAIN)
+        transform_val = get_augmentation_transform(constants.MODE_AUGMENTATION_VAL)
+        limit_for_testing = None
+        starting_index = 0
+
+        if config.debug_testing:
+            self.validation_path = self.training_path
+            starting_index = 0
+            limit_for_testing = 10
+            transform_train = transform_val
+
+
+        # if  self.dataset_slices is False
+        if not self.dataset_as_slices:
+            self.training_dataset = ImageSegmentationDataset(csv_file=self.training_path,
+                                                             limit_for_testing=limit_for_testing,
+                                                                starting_index=starting_index,
+                                                             transform=transform_train)
+            self.validation_dataset = ImageSegmentationDataset(csv_file=self.validation_path,
+                                                               limit_for_testing=limit_for_testing,
+                                                                starting_index=starting_index,
+                                                               transform=transform_val)
+        else:
+            self.training_dataset = ImageSegmentationMultipleSlicesAsChannelsDataset(csv_file=self.training_path,
+                                                                                     slices=self.num_slices,
+                                                                                     limit_for_testing=limit_for_testing,
+                                                                                     starting_index=starting_index,
+                                                                                     transform=transform_train)
+
+            self.validation_dataset = ImageSegmentationMultipleSlicesAsChannelsDataset(csv_file=self.validation_path,
+                                                                                       slices=self.num_slices,
+                                                                                       limit_for_testing=limit_for_testing,
+                                                                                       starting_index=starting_index,
+                                                                                       transform=transform_val)
+
         self.train_loader = DataLoader(self.training_dataset, batch_size=self.batch_size, shuffle=True)
         self.val_loader = DataLoader(self.validation_dataset, batch_size=self.batch_size, shuffle=False)
 
     def get_input_and_target_for_different_models(self, images, masks):
-        if self.model_name == constants.UNET_MODEL:
+        if self.model_name == constants.UNET_MODEL or self.model_name == constants.UNET_MODEL_GENERIC:
             return images, masks
         elif self.model_name == constants.AUTOENCODER_MODEL:
             return masks, masks
@@ -119,22 +152,31 @@ class TrainingClass:
                        "val_iou": mean_val_iou})
 
             number_of_epochs_without_improvement += 1
-            if mean_val_iou > best_val_iou:
-                best_val_iou = mean_val_iou
+            if mean_val_loss < best_val_loss:
+                best_val_loss = mean_val_loss
                 number_of_epochs_without_improvement = 0
-                if mean_val_iou > self.min_val_iou_for_saving:
+                if best_val_loss < self.min_val_iou_for_saving:
                     torch.save(self.model.state_dict(),
-                               f"model_unet_yaml_{mean_val_iou}{datetime.now().strftime('%Y_%m_%d__%H_%M_%S')}.pth")
+                               f"model_unet_generic_{mean_val_loss}{datetime.now().strftime('%Y_%m_%d__%H_%M_%S')}.pth")
             else:
                 if number_of_epochs_without_improvement > self.max_non_improvement_epochs:
                     print("Early stopping")
                     break
 
-
     def train_hybrid(self):
         best_val_iou = 0.0
         best_val_loss = 1000.0
         number_of_epochs_without_improvement = 0
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        autoencoder = Autoencoder().to(device)
+        autoencoder.load_state_dict(
+            torch.load('../training/model_0.83041048049926762023_02_18__12_51_37.pth', map_location=torch.device('cpu')))
+        autoencoder.eval()
+        encoder = autoencoder.encoder
+        ddl = torch.nn.Sequential(encoder, *list(autoencoder.flatten.children())[:2])
+        ddl.eval()
+
         for epoch in tqdm(range(self.num_epochs)):
             self.model.train()
             total_train_loss = 0.0
@@ -150,6 +192,17 @@ class TrainingClass:
                 outputs = torch.sigmoid(outputs)
                 # calculate loss
                 loss = self.criterion(outputs, masks)
+
+                # ddl loss
+                ls_gt = ddl(masks)
+                ls_pred = ddl(outputs)
+                # sigmoid
+                ls_gt = nn.Sigmoid()(ls_gt)
+                ls_pred = nn.Sigmoid()(ls_pred)
+                loss_bce = nn.BCELoss()(ls_pred, ls_gt)
+
+                loss = loss + 0.1 * loss_bce
+
                 # backward pass
                 loss.backward()
                 self.optimizer.step()
@@ -177,6 +230,18 @@ class TrainingClass:
                     outputs = self.model(images)
                     outputs = torch.sigmoid(outputs)
                     loss = self.criterion(outputs, masks)
+
+                    # ddl loss
+                    ls_gt = ddl(masks)
+                    ls_pred = ddl(outputs)
+                    # sigmoid
+                    ls_gt = nn.Sigmoid()(ls_gt)
+                    ls_pred = nn.Sigmoid()(ls_pred)
+                    loss_bce = nn.BCELoss()(ls_pred, ls_gt)
+
+                    loss = loss + 0.1 * loss_bce
+
+
                     single_batch_val_iou = self.IoU(outputs, masks)
                     total_val_iou += single_batch_val_iou
                     total_val_loss += loss.item()
@@ -191,12 +256,12 @@ class TrainingClass:
                        "val_iou": mean_val_iou})
 
             number_of_epochs_without_improvement += 1
-            if mean_val_iou > best_val_iou:
-                best_val_iou = mean_val_iou
+            if mean_val_loss < best_val_loss:
+                best_val_loss = mean_val_loss
                 number_of_epochs_without_improvement = 0
-                if mean_val_iou > self.min_val_iou_for_saving:
+                if mean_val_loss < self.min_val_iou_for_saving:
                     torch.save(self.model.state_dict(),
-                               f"model_unet_yaml_{mean_val_iou}{datetime.now().strftime('%Y_%m_%d__%H_%M_%S')}.pth")
+                               f"model_unet_yaml_{mean_val_loss}{datetime.now().strftime('%Y_%m_%d__%H_%M_%S')}.pth")
             else:
                 if number_of_epochs_without_improvement > self.max_non_improvement_epochs:
                     print("Early stopping")
@@ -205,11 +270,11 @@ class TrainingClass:
 
 def main():
     wandb.login()
-    with open("yaml_files/config_generic.yaml", "r") as f:
+    with open("yaml_files/generic_unet.yaml", "r") as f:
         config = yaml.safe_load(f)
 
-    sweep_id = wandb.sweep(config, project="unet-with-yaml")
-    wandb.agent(sweep_id, generic_training, count=10)
+    sweep_id = wandb.sweep(config, project="unet-multiple-channels")
+    wandb.agent(sweep_id, generic_training, count=1)
 
 
 if __name__ == '__main__':
