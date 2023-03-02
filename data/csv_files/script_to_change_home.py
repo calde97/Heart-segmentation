@@ -10,9 +10,7 @@ Change the path for the HOME if we use csv files produced on another machine.
 def change_home_path(path, new_home_path):
     # split the path by os.sep
     path = path.split(os.sep)
-    print(path)
     postfix = os.path.join(*path[-6:])
-    print(new_home_path)
     new_path = os.path.join(new_home_path, postfix)
 
     return new_path
