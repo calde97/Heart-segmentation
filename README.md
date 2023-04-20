@@ -6,13 +6,14 @@ This repository contains code for performing left ventricular segmentation using
 
 The repository is structured as follows:
 
-- `Data`: This folder contains code to load images from DICOM files and masks from NRRD files. It also includes code to create a CSV file for the training/validation test split. Various preprocessing steps are also included in this folder. Here there also the code for creating the custom dataset for pytorch
-- `Model`: This folder contains a baseline UNET model for left ventricular segmentation.
-- `Training`: This folder contains code to train the UNET model. It includes a fix for the IoU metrics.
+- `Data`: This folder contains code to load images from DICOM files and masks from NRRD files. It also includes code to create a CSV file for the training/validation test split. Various preprocessing steps are also included in this folder. Here there also the code for creating the custom dataset for pytorch and tensorflow.
+- `Model`: This folder contains the DL model for left ventricular segmentation.
+- `Training`: This folder contains code to train the models. It includes a fix for the IoU metrics.
 - `Evaluation`: This folder contains code for evaluating the model's performance.
-- `dash-visualizations`: This folder includes a Plotly visualization of the model results on the validation data.
+- `dash-visualizations`: This folder includes the Plotly visualization of the model results on the validation data.
 - `LICENSE`: This file contains the repository's license.
 - `requirements.txt`: This file lists the dependencies required to run the code in this repository.
+- `model_metrics`: This folder contains the metrics for the model. It includes the loss and IoU metrics for the training and validation data.
 
 ## Getting started
 
