@@ -1,6 +1,7 @@
 import os
 
-HOME = '/home/calde/Desktop/master-thesis-corino'
+# Change with your current HOME directory
+HOME = '/mnt/datafast'
 SOURCE_FOLDER = 'data-tesi-corino'
 DATA_HOME = os.path.join(HOME, SOURCE_FOLDER)
 IPERTROFIA_PATH = 'Data_ipertrofia'
