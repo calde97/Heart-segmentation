@@ -1,7 +1,6 @@
 import sys
 import traceback
 from datetime import datetime
-
 import torch
 import torchmetrics
 import yaml
@@ -13,7 +12,7 @@ from tqdm import tqdm
 import wandb
 from data import constants
 from data.custom_augmentations import get_augmentation_transform
-from data.input_data import ImageSegmentationDataset, ImageSegmentationMultipleSlicesAsChannelsDataset
+from data.input_data import ImageSegmentationDataset, ImageSegmentationMultipleSlicesAsChannelsDataset, ImageSegmentationLSTM
 from model.models import get_model_from_name, Autoencoder
 from model_metrics.metrics import get_criterion_from_name
 
@@ -42,6 +41,7 @@ class TrainingClass:
         self.min_val_iou_for_saving = config.min_val_iou_for_saving
         self.dataset_as_slices = config.dataset_as_slices
         self.num_slices = config.num_slices
+        self.use_lstm = config.use_lstm
 
         self.model = get_model_from_name(self.model_name, self.num_slices).to(self.device)
         self.criterion = get_criterion_from_name(self.criterion_name)
@@ -59,35 +59,48 @@ class TrainingClass:
             limit_for_testing = 10
             transform_train = transform_val
 
-
-        # if  self.dataset_slices is False
-        if not self.dataset_as_slices:
-            self.training_dataset = ImageSegmentationDataset(csv_file=self.training_path,
-                                                             limit_for_testing=limit_for_testing,
-                                                                starting_index=starting_index,
-                                                             transform=transform_train)
-            self.validation_dataset = ImageSegmentationDataset(csv_file=self.validation_path,
-                                                               limit_for_testing=limit_for_testing,
-                                                                starting_index=starting_index,
-                                                               transform=transform_val)
+        if self.use_lstm:
+            self.training_dataset = ImageSegmentationLSTM(csv_file=self.training_path,
+                                                          limit_for_testing=limit_for_testing,
+                                                            starting_index=starting_index,
+                                                            transform=transform_train,
+                                                          slices=self.num_slices)
+            self.validation_dataset = ImageSegmentationLSTM(csv_file=self.validation_path,
+                                                            limit_for_testing=limit_for_testing,
+                                                            starting_index=starting_index,
+                                                            transform=transform_val,
+                                                            slices=self.num_slices)
         else:
-            self.training_dataset = ImageSegmentationMultipleSlicesAsChannelsDataset(csv_file=self.training_path,
-                                                                                     slices=self.num_slices,
-                                                                                     limit_for_testing=limit_for_testing,
-                                                                                     starting_index=starting_index,
-                                                                                     transform=transform_train)
+            # if  self.dataset_slices is False
+            if not self.dataset_as_slices:
+                self.training_dataset = ImageSegmentationDataset(csv_file=self.training_path,
+                                                                 limit_for_testing=limit_for_testing,
+                                                                    starting_index=starting_index,
+                                                                 transform=transform_train)
+                self.validation_dataset = ImageSegmentationDataset(csv_file=self.validation_path,
+                                                                   limit_for_testing=limit_for_testing,
+                                                                    starting_index=starting_index,
+                                                                   transform=transform_val)
+            else:
+                self.training_dataset = ImageSegmentationMultipleSlicesAsChannelsDataset(csv_file=self.training_path,
+                                                                                         slices=self.num_slices,
+                                                                                         limit_for_testing=limit_for_testing,
+                                                                                         starting_index=starting_index,
+                                                                                         transform=transform_train)
 
-            self.validation_dataset = ImageSegmentationMultipleSlicesAsChannelsDataset(csv_file=self.validation_path,
-                                                                                       slices=self.num_slices,
-                                                                                       limit_for_testing=limit_for_testing,
-                                                                                       starting_index=starting_index,
-                                                                                       transform=transform_val)
+                self.validation_dataset = ImageSegmentationMultipleSlicesAsChannelsDataset(csv_file=self.validation_path,
+                                                                                           slices=self.num_slices,
+                                                                                           limit_for_testing=limit_for_testing,
+                                                                                           starting_index=starting_index,
+                                                                                           transform=transform_val)
 
         self.train_loader = DataLoader(self.training_dataset, batch_size=self.batch_size, shuffle=True)
         self.val_loader = DataLoader(self.validation_dataset, batch_size=self.batch_size, shuffle=False)
 
     def get_input_and_target_for_different_models(self, images, masks):
-        if self.model_name == constants.UNET_MODEL or self.model_name == constants.UNET_MODEL_GENERIC:
+        if self.model_name == constants.UNET_MODEL \
+                or self.model_name == constants.UNET_MODEL_GENERIC \
+                or self.model_name == constants.UNET_LSTM:
             return images, masks
         elif self.model_name == constants.AUTOENCODER_MODEL:
             return masks, masks
@@ -270,11 +283,11 @@ class TrainingClass:
 
 def main():
     wandb.login()
-    with open("yaml_files/generic_unet.yaml", "r") as f:
+    with open("yaml_files/unet-lstm.yaml", "r") as f:
         config = yaml.safe_load(f)
 
-    sweep_id = wandb.sweep(config, project="unet-multiple-channels")
-    wandb.agent(sweep_id, generic_training, count=1)
+    sweep_id = wandb.sweep(config, project="unet-lstm-fix-3")
+    wandb.agent(sweep_id, generic_training, count=10)
 
 
 if __name__ == '__main__':

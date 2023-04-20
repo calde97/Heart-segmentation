@@ -11,19 +11,26 @@ parameters:
     max: 0.01
     distribution: uniform
   num_epochs:
-    value: 250
+    value: 300
   criterion:
-    values: ['bce_loss', 'dice_loss']
+    values: ['dice_loss']
   model:
     value: 'unet'
   training_path:
-    value: "../data/csv_files/train.csv"
+    value: "../data/csv_files/train-fix.csv"
   validation_path:
-    value: "../data/csv_files/val.csv"
+    value: "../data/csv_files/val-fix.csv"
   max_non_improvement_epochs:
-    value: 60
+    value: 50
   min_val_iou_for_saving:
-    value: 0.70
+    value: 0.20
+  dataset_as_slices:
+    value: False
+  num_slices:
+    value: -1
+  debug_testing:
+    value: False
+
 
 
 

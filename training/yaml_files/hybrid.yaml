@@ -5,24 +5,25 @@ metric:
   goal: minimize
 parameters:
   batch_size:
-    values : [2, 4, 8]
+    value : 1
   learning_rate:
     min: 0.00001
     max: 0.01
     distribution: uniform
   num_epochs:
-    value: 200
+    value: 100
   criterion:
     values: ['dice_loss']
   model:
-    value: 'unet_generic'
+    value: 'unet'
   training_path:
-    value: "../data/csv_files/train-fix.csv"
+    value: "../data/csv_files/train.csv"
   validation_path:
-    value: "../data/csv_files/val-fix.csv"
+    value: "../data/csv_files/train.csv"
   max_non_improvement_epochs:
-    value: 40
+    value: 100
   min_val_iou_for_saving:
-    value: 0.20
+    value: 1
+
 
 
