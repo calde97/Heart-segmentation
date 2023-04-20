@@ -38,7 +38,7 @@ SIDEBAR_STYLE = {
 # the styles for the main content position it to the right of the sidebar and
 # add some padding.
 CONTENT_STYLE = {
-    "margin-left": "22rem",
+    "margin-left": "19rem",
     "margin-right": "2rem",
     "padding": "2rem 1rem",
 }
@@ -64,7 +64,7 @@ carousel = dbc.Carousel(
     indicators=True,
     variant='dark',
     className="carousel-fade",
-    style={"height": "1100px", "width": "1100px", 'margin_left':'27rem'}  # set th
+    style={"height": "1400px", "width": "1400px", 'margin_left':'0rem'}  # set th
 
 )
 
@@ -104,12 +104,14 @@ def render_bar_chart(patient, model_name):
 
     fig = px.bar(patient_df,
                  x='serial_number',
-                 y=["iou", "dice"],
+                 y=["dice", 'bce_latent_space'],
                  barmode='group',
                  title=f'IoU for patient : {patient}',)
-                 #color='iou')
+                 #color='dice')
     # update the layout of the figure. y axis is from 0 to 1
     fig.update_layout(yaxis_range=[0, 1])
+    # augment margin left
+
 
     return fig
 
@@ -135,4 +137,4 @@ def render_carousel(patient, model_name):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True, host='0.0.0.0', port=8137)
+    app.run_server(debug=True, host='0.0.0.0', port=8139)

@@ -7,6 +7,11 @@ import pydicom
 from natsort import natsorted
 
 from data import constants
+
+
+'''
+Utils file for preprocessing
+'''
 def create_mask_and_picture(folder: str, list_images, list_masks, names=None):
     # create folder if not exist
     if not os.path.exists(folder):

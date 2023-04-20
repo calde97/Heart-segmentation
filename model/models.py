@@ -4,22 +4,6 @@ import torch.nn as nn
 from data import constants
 
 
-class TinyModel(torch.nn.Module):
-
-    def __init__(self):
-        super(TinyModel, self).__init__()
-
-        self.linear1 = torch.nn.Linear(100, 200)
-        self.activation = torch.nn.ReLU()
-        self.linear2 = torch.nn.Linear(200, 10)
-        self.softmax = torch.nn.Softmax()
-
-    def forward(self, x):
-        x = self.linear1(x)
-        x = self.activation(x)
-        x = self.linear2(x)
-        x = self.softmax(x)
-        return x
 
 
 class UNet(nn.Module):
@@ -86,98 +70,6 @@ class UNet(nn.Module):
         return output_out
 
 
-
-class UNetLSTM(nn.Module):
-
-    def __init__(self, num_classes, num_sequence):
-        super(UNetLSTM, self).__init__()
-        self.num_sequence = num_sequence
-        self.num_classes = num_classes
-        self.contracting_11 = self.conv_block(in_channels=1, out_channels=64)
-        self.contracting_12 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.contracting_21 = self.conv_block(in_channels=64, out_channels=128)
-        self.contracting_22 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.contracting_31 = self.conv_block(in_channels=128, out_channels=256)
-        self.contracting_32 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.contracting_41 = self.conv_block(in_channels=256, out_channels=512)
-        self.contracting_42 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.middle = self.conv_block(in_channels=512, out_channels=1024)
-        self.expansive_11 = nn.ConvTranspose2d(in_channels=1024, out_channels=512, kernel_size=3, stride=2, padding=1,
-                                               output_padding=1)
-        self.expansive_12 = self.conv_block(in_channels=1024, out_channels=512)
-        self.expansive_21 = nn.ConvTranspose2d(in_channels=512, out_channels=256, kernel_size=3, stride=2, padding=1,
-                                               output_padding=1)
-        self.expansive_22 = self.conv_block(in_channels=512, out_channels=256)
-        self.expansive_31 = nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=3, stride=2, padding=1,
-                                               output_padding=1)
-        self.expansive_32 = self.conv_block(in_channels=256, out_channels=128)
-        self.expansive_41 = nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=3, stride=2, padding=1,
-                                               output_padding=1)
-        self.expansive_42 = self.conv_block(in_channels=128, out_channels=64)
-        self.output = nn.Conv2d(in_channels=64, out_channels=num_classes, kernel_size=3, stride=1, padding=1)
-
-        self.conv_lstm_middle = ConvLSTM(512, 512, (3, 3), 3, True, True, return_all_layers=True)
-
-    def conv_block(self, in_channels, out_channels):
-        block = nn.Sequential(
-            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(num_features=out_channels),
-            nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.BatchNorm2d(num_features=out_channels))
-        return block
-
-    # X is a tensor of shape (batch_size, num_sequence, 1, 256, 256)
-    def forward(self, X):
-        data_list = [X[0, i, ...].unsqueeze(0) for i in range(self.num_sequence)]# [-1, 64, 256, 256]
-        contracting_11_out = [self.contracting_11(data) for data in data_list]# [-1, 64, 256, 256]
-        contracting_12_out = [self.contracting_12(data) for data in contracting_11_out]# [-1, 64, 128, 128]
-        contracting_21_out = [self.contracting_21(data) for data in contracting_12_out]# [-1, 128, 128, 128]
-        contracting_22_out = [self.contracting_22(data) for data in contracting_21_out]# [-1, 128, 64, 64]
-        contracting_31_out = [self.contracting_31(data) for data in contracting_22_out]# [-1, 256, 64, 64]
-        contracting_32_out = [self.contracting_32(data) for data in contracting_31_out]# [-1, 256, 32, 32]
-        contracting_41_out = [self.contracting_41(data) for data in contracting_32_out]# [-1, 512, 32, 32]
-        contracting_42_out = [self.contracting_42(data) for data in contracting_41_out]# [-1, 512, 16, 16]
-
-        # LSTM ###############################################################################
-        # create tensor from contracting_42_out list. Each element is a sequence element
-        tensor_contracting_42_out = torch.cat(contracting_42_out, dim=0)
-        tensor_contracting_42_out = tensor_contracting_42_out.unsqueeze(0)
-        _, last_states = self.conv_lstm_middle(tensor_contracting_42_out)
-        output_lstm = [state[0] for state in last_states]
-        # LSTM ###############################################################################
-
-        middle_out = [self.middle(data) for data in output_lstm] # [-1, 1024, 16, 16]
-        expansive_11_out = [self.expansive_11(data) for data in middle_out] # [-1, 512, 32, 32]
-
-        concatenations = [torch.cat((single_expansive_11_out, single_contracting_41_out), dim=1)
-                          for single_expansive_11_out, single_contracting_41_out in zip(expansive_11_out, contracting_41_out)]
-
-        expansive_12_out = [self.expansive_12(data) for data in concatenations]  # [-1, 1024, 32, 32] -> [-1, 512, 32, 32]
-
-
-
-        expansive_21_out = [self.expansive_21(data) for data in expansive_12_out]  # [-1, 256, 64, 64]
-        concatenated_data = [torch.cat((data_expansive_21_out, data_contracting_31_out), dim=1)
-                             for data_expansive_21_out, data_contracting_31_out in zip(expansive_21_out, contracting_31_out)]
-        expansive_22_out = [self.expansive_22(data) for data in concatenated_data]  # [-1, 512, 64, 64] -> [-1, 256, 64, 64]
-        expansive_31_out = [self.expansive_31(data) for data in expansive_22_out]  # [-1, 128, 128, 128]
-
-        concatenated_data = [torch.cat((data_expansive_31_out, data_contracting_21_out), dim=1)
-                             for data_expansive_31_out, data_contracting_21_out in zip(expansive_31_out, contracting_21_out)]
-        expansive_32_out = [self.expansive_32(data) for data in concatenated_data] # [-1, 256, 128, 128] -> [-1, 128, 128, 128]
-        expansive_41_out = [self.expansive_41(data) for data in expansive_32_out]  # [-1, 64, 256, 256]
-
-        concatenated_data = [torch.cat((data_expansive_41_out, data_contracting_11_out), dim=1)
-                             for data_expansive_41_out, data_contracting_11_out in zip(expansive_41_out, contracting_11_out)]
-        expansive_42_out = [self.expansive_42(data) for data in concatenated_data]  # [-1, 128, 256, 256] -> [-1, 64, 256, 256]
-        output_out = [self.output(data) for data in expansive_42_out]
-        # transform output_out to tensor
-        output_out = torch.cat(output_out, dim=0)
-        output_out = output_out.unsqueeze(0)
-        # [-1, num_classes, 256, 256]
-        return output_out
 
 
 class Autoencoder(nn.Module):
@@ -823,7 +715,10 @@ def get_model_from_name(name, in_channels=1):
                            conv_mode='same',
                            dim=2)
 
-    # TODO add UnetLSTM
+
+    if name == constants.UNET_LSTM:
+        return UNetLSTM(num_classes=1,
+                        num_sequence=3)
 
     else:
         raise ValueError('Unknown model name: {}'.format(name))

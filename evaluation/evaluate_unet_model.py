@@ -8,12 +8,12 @@ from tqdm import tqdm
 
 from data.custom_augmentations import get_val_transform
 from data.input_data import ImageSegmentationDataset
-from model.models import UNet
+from model.models import UNet, Autoencoder
 from torchmetrics import Dice, Precision, Recall, F1Score
 import numpy as np
 import pandas as pd
 #%%
-def plot_prediction_and_gt(images, masks, predictions, metrics_iou, save_flag=False,
+def plot_prediction_and_gt(images, masks, predictions, metrics_iou, latent_loss=None, save_flag=False,
                            model_name='None', patient=None, serial_numbers=None):
     outputs_np = predictions.cpu().numpy()
     masks_np = masks.cpu().numpy()
@@ -21,26 +21,26 @@ def plot_prediction_and_gt(images, masks, predictions, metrics_iou, save_flag=Fa
 
     for index in range(images.shape[0]):
         # Create a single plot with two columns and one row
-        fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+        fig, axs = plt.subplots(1, 3, figsize=(24, 8))
 
         # Plot the first image on the left
-        axs[0].imshow(images_np[index, 0, :, :], cmap=plt.cm.bone)
+        axs[0].imshow(images_np[index, 0, :, :], cmap='gray')
         axs[0].set_title('Original Image')
 
         # Plot the second image on the right
-        axs[1].imshow(images_np[index, 0, :, :], cmap=plt.cm.bone)
-        axs[1].imshow(masks_np[index, 0, :, :], alpha=0.3, cmap='gray')
+        axs[1].imshow(images_np[index, 0, :, :], cmap='gray')
+        axs[1].imshow(masks_np[index, 0, :, :], alpha=0.4, cmap='gray')
         axs[1].set_title('Ground truth')
 
         # Plot the third image on the right
-        axs[2].imshow(images_np[index, 0, :, :], cmap=plt.cm.bone)
-        axs[2].imshow(outputs_np[index, 0, :, :], alpha=0.3, cmap='gray')
-        axs[2].set_title(f'Predicted output. Iou : {metrics_iou[index]:.4f}')
+        axs[2].imshow(images_np[index, 0, :, :], cmap='gray')
+        axs[2].imshow(outputs_np[index, 0, :, :], alpha=0.4, cmap='gray', vmin=0.5)
+        axs[2].set_title(f'Dice : {metrics_iou[index]:.4f} \nLatent loss :{latent_loss[index]:.4f}')
 
         # Set the plot width a little greater than the sum of the two subplots
         fig_width = axs[0].get_window_extent().width + axs[1].get_window_extent().width + \
                     axs[2].get_window_extent().width + 10
-        fig.set_size_inches(fig_width / 80, 4)  # 80 pixels per inch (dpi)
+        fig.set_size_inches(fig_width / 80, 8)  # 80 pixels per inch (dpi)
         if save_flag:
             save_path = os.path.join('dash-visualizations', 'assets', 'models_evaluation', model_name, patient)
             if not os.path.exists(save_path):
@@ -49,6 +49,7 @@ def plot_prediction_and_gt(images, masks, predictions, metrics_iou, save_flag=Fa
             plt.savefig(name_file)
         else:
             plt.show()
+
 
 
 if __name__ == '__main__':
@@ -62,10 +63,10 @@ if __name__ == '__main__':
     # Load the datasets
     if os.path.exists('data/csv_files/train.csv'):
         train_path = 'data/csv_files/train.csv'
-        val_path = 'data/csv_files/val.csv'
+        val_path = 'data/csv_files/test.csv'
     else:
         train_path = '../data/csv_files/train.csv'
-        val_path = '../data/csv_files/val.csv'
+        val_path = '../data/csv_files/test.csv'
 
     transform = get_val_transform()
     val_dataset = ImageSegmentationDataset(csv_file=val_path,
@@ -90,6 +91,14 @@ if __name__ == '__main__':
     model.to(device)
     model.eval()
 
+    autoencoder = Autoencoder().to(device)
+    autoencoder.load_state_dict(
+        torch.load('training/model_0.83041048049926762023_02_18__12_51_37.pth', map_location=torch.device('cpu')))
+    autoencoder.eval()
+    encoder = autoencoder.encoder
+    ddl = torch.nn.Sequential(encoder, *list(autoencoder.flatten.children())[:2])
+    ddl.eval()
+
     # Do inference on the validation set
     iou = torchmetrics.JaccardIndex(num_classes=1, task='binary')
     iou_for_all = []
@@ -97,6 +106,7 @@ if __name__ == '__main__':
     precision_for_all = []
     recall_for_all = []
     f1_for_all = []
+    latent_losses = []
 
 
     for images, masks, patient_names, serial_numbers in tqdm(val_loader):
@@ -119,14 +129,32 @@ if __name__ == '__main__':
                 precision_for_all.append(precision_coeff)
                 recall_coeff = Recall(task='binary', num_classes=1, )(outputs[i, :, :, :], masks_integer)
                 recall_for_all.append(recall_coeff)
+                # latent error
+                ls_gt = ddl(masks)
+                ls_pred = ddl(outputs)
+                # sigmoid
+                ls_gt = nn.Sigmoid()(ls_gt)
+                ls_pred = nn.Sigmoid()(ls_pred)
+                loss_bce = nn.BCELoss()(ls_pred, ls_gt)
+                # get float value and append to list
+                latent_losses.append(float(loss_bce))
 
                 # transform metrics_iou to list of floats
+            dices = [float(dice_coefficient)]
+            latents = [float(loss_bce)]
             iou_for_all.extend(metrics_iou)
-            '''plot_prediction_and_gt(images, masks, outputs, metrics_iou,
-                                   save_flag=False, model_name='unet',
-                                   patient=patient_names[0], serial_numbers=serial_numbers)'''
 
-    metrics_iou = [float(i) for i in iou_for_all]
+            try:
+                plot_prediction_and_gt(images, masks, outputs, dices,
+                                       save_flag=True, model_name='unet2-test', latent_loss=latents,
+                                       patient=patient_names[0], serial_numbers=serial_numbers)
+            except:
+                print('error')
+                continue
+
+
+
+    iou_for_all = [float(i) for i in iou_for_all]
     dice_for_all = [float(i) for i in dice_for_all]
     precision_for_all = [float(i) for i in precision_for_all]
     recall_for_all = [float(i) for i in recall_for_all]
@@ -134,13 +162,21 @@ if __name__ == '__main__':
 
 
     # read evaluation metrics from file
-    df = pd.read_csv('evaluation/csv_files/unet.csv')
+    df = pd.read_csv('data/csv_files/test.csv')
     # append new metrics
     df['dice'] = dice_for_all
     df['precision'] = precision_for_all
     df['recall'] = recall_for_all
+    df['iou'] = iou_for_all
+    latent_losses = (latent_losses - np.min(latent_losses)) / (
+                np.max(latent_losses) - np.min(latent_losses))
 
-    df.to_csv('evaluation/csv_files/unet2.csv', index=False)
+    df['latent'] = latent_losses
+
+    # only leave the columns patient, serial_number, dice, precision, recall, iou
+    df = df[['patient', 'serial_number', 'dice', 'precision', 'recall', 'iou', 'latent']]
+
+    df.to_csv('evaluation/csv_files/unet2-test.csv', index=False)
 
     # save the iou_for_all into a numpy file for later use
     #np.save('iou_for_all2.npy', iou_for_all)

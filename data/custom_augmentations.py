@@ -2,6 +2,10 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from data import constants
 
+'''
+Custom augmentation for the deep learning training.
+'''
+
 
 def get_train_transform():
     return A.Compose([

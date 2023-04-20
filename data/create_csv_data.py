@@ -1,14 +1,16 @@
-import os
-
 import nrrd
 import numpy as np
+import os
 import pandas as pd
 from natsort import natsorted
-# import library to create loading bar time for a loop
 from tqdm import tqdm
 
-import constants
-from preprocessing import read_nrrd, get_dicom_order, read_dicom
+from data import constants
+from data.preprocessing import read_nrrd, get_dicom_order, read_dicom
+
+'''
+Create a csv file from the DICOM and ROI folders. A csv file with all the slices of the patient is created
+'''
 
 
 def get_category(path):
