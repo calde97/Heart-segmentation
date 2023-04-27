@@ -22,7 +22,7 @@ To get started with this repository, you will need to install the required depen
 ```bash
 pip install -r requirements.txt
 ```
-Remember to also intall pytorch from the official website
+Remember to also intall pytorch from the official website : https://pytorch.org/
 
 
 
