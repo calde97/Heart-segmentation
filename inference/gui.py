@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, ttk
 from tkinter import messagebox
-from inference.inference import load_model, run_inference
+from inference.inferences import load_model, run_inference
 from inference.postprocessing import post_process
 import nrrd
 import threading

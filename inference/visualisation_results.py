@@ -33,7 +33,7 @@ path = args.folder
 patients = os.listdir(path)
 
 starting_image = os.path.join(path, patients[0], 'image.nrrd')
-starting_prediction = os.path.join(path, patients[0], 'prediction.nrrd')
+starting_prediction = os.path.join(path, patients[0], 'prediction_post.nrrd')
 
 
 #%%
